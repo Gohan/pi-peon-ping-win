@@ -31,5 +31,7 @@ jobs:
       # 可选:跑 typecheck 验证再发布(失败则不发布)
       - run: npm run typecheck --if-present
 
-      # 不需要 NODE_AUTH_TOKEN —— OIDC 自动处理
-      - run: npm publish --access public
+      # OIDC Trusted Publishing:必须加 --provenance 才会触发 npm 用 OIDC 换短期凭据,
+      # 否则 npm 会尝试用空的 NODE_AUTH_TOKEN 发布,得到 404。
+      # 见 https://docs.npmjs.com/generating-provenance-statements
+      - run: npm publish --access public --provenance
