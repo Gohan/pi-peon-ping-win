@@ -1,0 +1,35 @@
+name: Publish to npm
+
+on:
+  push:
+    tags:
+      - 'v*'           # 触发: git tag v1.0.0 && git push --tags
+  workflow_dispatch:   # 也允许手动触发(从 Actions 标签页)
+
+# 关键:OIDC 必需。没有这个权限 npm 拿不到短期凭据。
+permissions:
+  id-token: write      # Required for OIDC
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Trusted Publishing 要求 Node >= 22.14.0 + npm >= 11.5.1
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+          # 发布构建永远不要用缓存,避免缓存投毒
+          package-manager-cache: false
+
+      # 安装依赖(这个包没有运行时依赖,只装 devDeps 用于 typecheck)
+      - run: npm ci || npm install
+
+      # 可选:跑 typecheck 验证再发布(失败则不发布)
+      - run: npm run typecheck --if-present
+
+      # 不需要 NODE_AUTH_TOKEN —— OIDC 自动处理
+      - run: npm publish --access public
