@@ -8,9 +8,9 @@
  */
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { basename } from "node:path";
 import { playCategorySound, sendNotification } from "./audio";
 import { ensureDirs, loadConfig, loadState, saveState } from "./config";
+import { buildNotifyContent, extractLastAssistantText, resolveProjectName } from "./notify-content";
 import { listPacks } from "./packs";
 import { checkRelayHealth, detectRemoteSession, getRelayUrl, relaySetupInstructions } from "./relay";
 import { createSettingsPanel, runInstall } from "./ui";
@@ -85,9 +85,20 @@ export default function (pi: ExtensionAPI) {
     if (!shouldPlaySounds(ctx)) return;
 
     playCategorySound("task.error", config, state);
+
+    if (config.enabled && !state.paused && config.desktop_notifications) {
+      const project = resolveProjectName(ctx.cwd, pi);
+      const { title, body } = buildNotifyContent("error", project, `${event.toolName} failed`);
+      sendNotification(
+        title,
+        body,
+        config,
+        ctx.hasUI ? ctx.ui.notify.bind(ctx.ui) : undefined,
+      );
+    }
   });
 
-  pi.on("agent_end", async (_event, ctx) => {
+  pi.on("agent_end", async (event, ctx) => {
     config = loadConfig();
     state = loadState();
     if (!shouldPlaySounds(ctx)) return;
@@ -103,10 +114,36 @@ export default function (pi: ExtensionAPI) {
     playCategorySound("task.complete", config, state);
 
     if (config.enabled && !state.paused) {
-      const project = basename(ctx.cwd);
+      const project = resolveProjectName(ctx.cwd, pi);
+      // Body: assistant's last text response (truncated), so the popup
+      // actually tells you what just happened. Falls back to a generic
+      // label when there's no extractable text (e.g. tool-call-only turn).
+      const summary = extractLastAssistantText(event.messages);
+      const { title, body } = buildNotifyContent("done", project, summary || undefined);
       sendNotification(
-        `pi · ${project}`,
-        "Task complete",
+        title,
+        body,
+        config,
+        ctx.hasUI ? ctx.ui.notify.bind(ctx.ui) : undefined,
+      );
+    }
+  });
+
+  // Context window filling up — compaction about to start. Mirrors upstream
+  // peon-ping's PreCompact → resource.limit mapping.
+  pi.on("session_before_compact", async (_event, ctx) => {
+    config = loadConfig();
+    state = loadState();
+    if (!shouldPlaySounds(ctx)) return;
+
+    playCategorySound("resource.limit", config, state);
+
+    if (config.enabled && !state.paused && config.desktop_notifications) {
+      const project = resolveProjectName(ctx.cwd, pi);
+      const { title, body } = buildNotifyContent("compacting", project);
+      sendNotification(
+        title,
+        body,
         config,
         ctx.hasUI ? ctx.ui.notify.bind(ctx.ui) : undefined,
       );
