@@ -6,7 +6,7 @@ import { detectPlatform, detectPwshBin, type Platform } from "./platform";
 
 export const DEFAULT_ICON_PATH = join(DATA_DIR, "peon-icon.png");
 
-export type Notifier = "osascript" | "notify-send" | "powershell";
+export type Notifier = "osascript" | "notify-send" | "powershell" | "winforms";
 
 export interface NotifyCommand {
   bin: string;
@@ -36,6 +36,11 @@ export function detectNotifier(
     case "linux":
       return commandExists("notify-send") ? "notify-send" : null;
     case "win":
+      // Fork: native Windows uses a custom WinForms popup (multi-screen,
+      // icon on the left, text left-aligned, top-most, auto-dismiss after
+      // 4s). Bypasses the Windows Toast system entirely — no AUMID
+      // registration, no Focus Assist suppression, more visually prominent.
+      return "winforms";
     case "wsl":
       return "powershell";
     default:
@@ -70,6 +75,9 @@ export function buildNotifyCommand(
       if (iconPath) args.push(`--icon=${iconPath}`);
       args.push(title, body);
       return { bin: "notify-send", args };
+    }
+    case "winforms": {
+      return buildWinFormsCommand(safeTitle, safeBody, iconPath);
     }
     case "powershell": {
       let iconXml = "";
@@ -120,4 +128,104 @@ export function sendDesktopNotification(
   } catch {
     return false;
   }
+}
+
+// Fork: native Windows custom popup using WinForms.
+//
+// Why not Windows Toast (the upstream WSL code path)?
+//   1. WinRT Toast from a `-NonInteractive -Command` background PowerShell
+//      process silently fails to render (same root cause as WPF MediaPlayer).
+//   2. Even when it renders, Toast requires a registered AppUserModelID
+//      (AUMID) in the registry AND a Start Menu shortcut for scenario=
+//      reminder to work; otherwise Windows drops the notification silently.
+//   3. Toast is corner-only, small, and visually weak.
+//
+// WinForms Form.Show + Application.Run works reliably in a spawned
+// PowerShell process. We get: arbitrary position (1/4 screen height),
+// multi-monitor support, custom layout (icon left + text left-aligned),
+// no AUMID/registry/Start Menu dependencies, not suppressed by Focus Assist.
+function buildWinFormsCommand(
+  title: string,
+  body: string,
+  iconPath?: string,
+): NotifyCommand {
+  // Paths into PowerShell single-quoted strings: escape ' as ''
+  const psSingle = (s: string) => s.replace(/'/g, "''");
+  const iconWinPath = iconPath ? iconPath.replace(/\//g, "\\") : "";
+  const safeIconPath = psSingle(iconWinPath);
+
+  // PowerShell template. Single-quoted strings inside; we interpolate only
+  // safe values from above.
+  const ps = `Add-Type -AssemblyName System.Windows.Forms,System.Drawing
+
+$iconPath = '${safeIconPath}'
+$hasIcon = ($iconPath -ne '') -and (Test-Path $iconPath)
+$screens = [System.Windows.Forms.Screen]::AllScreens
+$forms = New-Object System.Collections.ArrayList
+$formWidth = 580
+$formHeight = 180
+
+foreach ($screen in $screens) {
+    $form = New-Object System.Windows.Forms.Form
+    $form.Text = 'peon-ping'
+    $form.TopMost = $true
+    $form.FormBorderStyle = 'None'
+    $form.BackColor = [System.Drawing.Color]::FromArgb(30, 30, 40)
+    $form.Size = New-Object System.Drawing.Size($formWidth, $formHeight)
+    $form.ShowInTaskbar = $false
+    $form.StartPosition = 'Manual'
+
+    $wa = $screen.WorkingArea
+    $x = $wa.X + [int](($wa.Width - $formWidth) / 2)
+    $y = $wa.Y + [int]($wa.Height / 4) - [int]($formHeight / 2)
+    $form.Location = New-Object System.Drawing.Point($x, $y)
+
+    if ($hasIcon) {
+        $pictureBox = New-Object System.Windows.Forms.PictureBox
+        $pictureBox.Location = New-Object System.Drawing.Point(20, 40)
+        $pictureBox.Size = New-Object System.Drawing.Size(100, 100)
+        $pictureBox.SizeMode = [System.Windows.Forms.PictureBoxSizeMode]::Zoom
+        $pictureBox.Image = [System.Drawing.Image]::FromFile($iconPath)
+        $form.Controls.Add($pictureBox)
+    }
+
+    $textX = $(if ($hasIcon) { 140 } else { 20 })
+    $textWidth = $(if ($hasIcon) { 420 } else { 540 })
+
+    $label1 = New-Object System.Windows.Forms.Label
+    $label1.Text = '${title.replace(/'/g, "''")}'
+    $label1.Font = New-Object System.Drawing.Font('Segoe UI', 24, [System.Drawing.FontStyle]::Bold)
+    $label1.ForeColor = [System.Drawing.Color]::White
+    $label1.AutoSize = $false
+    $label1.Size = New-Object System.Drawing.Size($textWidth, 60)
+    $label1.TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
+    $label1.Location = New-Object System.Drawing.Point($textX, 30)
+
+    $label2 = New-Object System.Windows.Forms.Label
+    $label2.Text = '${body.replace(/'/g, "''")}'
+    $label2.Font = New-Object System.Drawing.Font('Segoe UI', 14)
+    $label2.ForeColor = [System.Drawing.Color]::LightGray
+    $label2.AutoSize = $false
+    $label2.Size = New-Object System.Drawing.Size($textWidth, 40)
+    $label2.TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
+    $label2.Location = New-Object System.Drawing.Point($textX, 100)
+
+    $form.Controls.Add($label1)
+    $form.Controls.Add($label2)
+    $forms.Add($form) | Out-Null
+}
+
+foreach ($f in $forms) { $f.Show() | Out-Null }
+
+$timer = New-Object System.Windows.Forms.Timer
+$timer.Interval = 4000
+$timer.Add_Tick({
+    foreach ($f in $forms) { $f.Close() }
+    [System.Windows.Forms.Application]::Exit()
+})
+$timer.Start()
+
+[System.Windows.Forms.Application]::Run()`;
+
+  return { bin: "powershell.exe", args: ["-NoProfile", "-STA", "-Command", ps] };
 }
