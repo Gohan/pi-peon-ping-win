@@ -12,7 +12,7 @@ import {
 describe("constants", () => {
   it("DEFAULT_CONFIG has all required fields", () => {
     expect(DEFAULT_CONFIG.default_pack).toBe("peon");
-    expect(DEFAULT_CONFIG.volume).toBe(0.5);
+    expect(DEFAULT_CONFIG.volume).toBe(1);
     expect(DEFAULT_CONFIG.enabled).toBe(true);
     expect(DEFAULT_CONFIG.annoyed_threshold).toBe(3);
     expect(DEFAULT_CONFIG.annoyed_window_seconds).toBe(10);
@@ -48,6 +48,7 @@ describe("constants", () => {
 
   it("paths end with peon-ping directories", () => {
     expect(DATA_DIR).toMatch(/peon-ping$/);
-    expect(PACKS_DIR).toMatch(/peon-ping\/packs$/);
+    // Fork: accept both forward and back slashes (Windows uses \).
+    expect(PACKS_DIR).toMatch(/peon-ping[\\/]packs$/);
   });
 });

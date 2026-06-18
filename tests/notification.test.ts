@@ -55,7 +55,9 @@ describe("notification", () => {
       const { buildNotifyCommand } = await import("../src/notification");
       const cmd = buildNotifyCommand("powershell", "Title", "Body");
       expect(cmd).not.toBeNull();
-      expect(cmd!.bin).toBe("powershell.exe");
+      // Fork: bin is now dynamic via detectPwshBin() — pwsh if installed, else
+      // powershell.exe. Accept any of the four valid forms.
+      expect(cmd!.bin).toMatch(/^(pwsh|powershell)(\.exe)?$/);
       const scriptArg = cmd!.args.find((a: string) => a.includes("Title"));
       expect(scriptArg).toBeDefined();
       expect(scriptArg).toContain("Body");
