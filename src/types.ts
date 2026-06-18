@@ -20,6 +20,10 @@ export interface PeonConfig {
   annoyed_window_seconds: number;
   silent_window_seconds: number;
   relay_mode: RelayMode;
+  // Fork addition: how long the PowerShell MediaPlayer process stays alive
+  // after calling Play(). Lowering this reduces zombie-process buildup when
+  // sounds trigger rapidly. Sound clips are typically 1–2s; default 2s.
+  playback_wait_seconds: number;
 }
 
 export interface PeonState {

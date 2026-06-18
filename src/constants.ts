@@ -11,7 +11,11 @@ export const LEGACY_PACKS = join(homedir(), ".claude", "hooks", "peon-ping", "pa
 
 export const DEFAULT_CONFIG: PeonConfig = {
   default_pack: "peon",
-  volume: 0.5,
+  // Fork default: 1.0 (upstream uses 0.5). peon-ping is an alert sound — at
+  // 0.5 it's easy to miss on Windows where ffplay's volume scaling is lower
+  // than upstream WPF MediaPlayer. Users who want it quieter can edit
+  // config.json or use the /peon settings panel.
+  volume: 1.0,
   enabled: true,
   desktop_notifications: true,
   categories: {
@@ -27,6 +31,9 @@ export const DEFAULT_CONFIG: PeonConfig = {
   annoyed_window_seconds: 10,
   silent_window_seconds: 0,
   relay_mode: "auto",
+  // Fork default: 2s (upstream hardcodes 3s in audio.ts). Clips are short;
+  // shorter wait = fewer lingering powershell processes when events fire fast.
+  playback_wait_seconds: 2,
 };
 
 export const DEFAULT_STATE: PeonState = {

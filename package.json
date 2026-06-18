@@ -1,13 +1,20 @@
 {
-  "name": "pi-peon-ping",
-  "version": "0.2.0",
-  "description": "Pi extension for peon-ping sound notifications",
-  "keywords": ["pi-package"],
+  "name": "@baozs/pi-peon-ping-win",
+  "version": "1.0.0",
+  "description": "Pi extension for peon-ping sound notifications — fork with native Windows support (ffplay/mpv + winmm.dll PlaySound fallback)",
+  "keywords": ["pi-package", "peon-ping", "windows", "pi-extension"],
   "type": "module",
   "license": "MIT",
+  "author": "cppgohan",
+  "contributors": [
+    "Josh Thomas <josh@joshuadavidthomas.com> (original pi-peon-ping)"
+  ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/joshuadavidthomas/pi-peon-ping"
+    "url": "https://github.com/Gohan/pi-peon-ping-win.git"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "pi": {
     "extensions": ["./src/index.ts"]

@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { join } from "node:path";
-import { detectLinuxPlayer, detectPlatform, type Platform } from "./platform";
+import { detectLinuxPlayer, detectPlatform, detectPwshBin, detectWindowsPlayer, type Platform } from "./platform";
 import { saveState } from "./config";
 import { resolveIcon, sendDesktopNotification } from "./notification";
 import { getPacksDir, pickSound } from "./packs";
@@ -20,7 +20,11 @@ export function killPreviousSound(): void {
   }
 }
 
-export function playSound(file: string, volume: number): void {
+function pct(volume: number): number {
+  return Math.max(0, Math.min(100, Math.round(volume * 100)));
+}
+
+export function playSound(file: string, volume: number, waitSeconds = 2): void {
   killPreviousSound();
 
   let child;
@@ -33,7 +37,57 @@ export function playSound(file: string, volume: number): void {
       });
       break;
 
+    case "win": {
+      // Fork note: native Windows. Try ffplay / mpv first (volume-capable,
+      // also used by the linux branch for symmetry), then fall back to
+      // winmm.dll PlaySound via PowerShell P/Invoke (no external deps but
+      // no volume control either).
+      //
+      // Why not WPF MediaPlayer like upstream WSL? Because MediaPlayer
+      // silently fails to render audio in a `-NonInteractive -Command`
+      // background process — there's no WPF Dispatcher message pump.
+      const winPlayer = detectWindowsPlayer();
+
+      if (winPlayer === "ffplay") {
+        child = spawn("ffplay", ["-nodisp", "-autoexit", "-volume", String(pct(volume)), file], {
+          stdio: "ignore", detached: true,
+        });
+        break;
+      }
+
+      if (winPlayer === "mpv") {
+        child = spawn("mpv", ["--no-video", `--volume=${pct(volume)}`, file], {
+          stdio: "ignore", detached: true,
+        });
+        break;
+      }
+
+      // Fallback: winmm.dll PlaySound. Synchronous (SND_SYNC), blocks until
+      // the wav finishes. `volume` and `waitSeconds` are ignored here —
+      // install ffplay (`winget install Gyan.FFmpeg`) or mpv for volume.
+      const psBin = detectPwshBin() ?? "powershell.exe";
+      const winPath = file.replace(/\//g, "\\");
+      const cmd = `
+        Add-Type -TypeDefinition @'
+        using System.Runtime.InteropServices;
+        public class WinMm {
+          [DllImport("winmm.dll", SetLastError=true, CharSet=CharSet.Auto)]
+          public static extern bool PlaySound(string lpszName, System.IntPtr hModule, uint fdwSound);
+        }
+'@
+        # SND_FILENAME = 0x00020000, SND_SYNC = 0x0000 (default)
+        [WinMm]::PlaySound('${winPath.replace(/\\/g, "\\\\")}', [IntPtr]::Zero, 0x00020000) | Out-Null
+      `;
+      child = spawn(psBin, ["-NoProfile", "-NonInteractive", "-Command", cmd], {
+        stdio: "ignore",
+        detached: true,
+      });
+      break;
+    }
+
     case "wsl": {
+      // Upstream code path, unchanged.
+      const psBin = detectPwshBin() ?? "powershell.exe";
       const cmd = `
         Add-Type -AssemblyName PresentationCore
         $p = New-Object System.Windows.Media.MediaPlayer
@@ -41,10 +95,10 @@ export function playSound(file: string, volume: number): void {
         $p.Volume = ${volume}
         Start-Sleep -Milliseconds 200
         $p.Play()
-        Start-Sleep -Seconds 3
+        Start-Sleep -Seconds ${waitSeconds}
         $p.Close()
       `;
-      child = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", cmd], {
+      child = spawn(psBin, ["-NoProfile", "-NonInteractive", "-Command", cmd], {
         stdio: "ignore",
         detached: true,
       });
@@ -69,15 +123,13 @@ export function playSound(file: string, volume: number): void {
           break;
         }
         case "ffplay": {
-          const ffVol = Math.max(0, Math.min(100, Math.round(volume * 100)));
-          child = spawn("ffplay", ["-nodisp", "-autoexit", "-volume", String(ffVol), file], {
+          child = spawn("ffplay", ["-nodisp", "-autoexit", "-volume", String(pct(volume)), file], {
             stdio: "ignore", detached: true,
           });
           break;
         }
         case "mpv": {
-          const mpvVol = Math.max(0, Math.min(100, Math.round(volume * 100)));
-          child = spawn("mpv", ["--no-video", `--volume=${mpvVol}`, file], {
+          child = spawn("mpv", ["--no-video", `--volume=${pct(volume)}`, file], {
             stdio: "ignore", detached: true,
           });
           break;
@@ -142,7 +194,7 @@ export function playCategorySound(category: string, config: PeonConfig, state: P
 
   const sound = pickSound(category, config, state);
   if (sound) {
-    playSound(sound.file, config.volume);
+    playSound(sound.file, config.volume, config.playback_wait_seconds);
     saveState(state);
   }
 }

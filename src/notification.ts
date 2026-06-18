@@ -2,7 +2,7 @@ import { spawn, execSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { DATA_DIR } from "./constants";
-import { detectPlatform, type Platform } from "./platform";
+import { detectPlatform, detectPwshBin, type Platform } from "./platform";
 
 export const DEFAULT_ICON_PATH = join(DATA_DIR, "peon-icon.png");
 
@@ -35,6 +35,7 @@ export function detectNotifier(
       return "osascript";
     case "linux":
       return commandExists("notify-send") ? "notify-send" : null;
+    case "win":
     case "wsl":
       return "powershell";
     default:
@@ -85,7 +86,7 @@ $text.Item(1).AppendChild($template.CreateTextNode('${safeBody}')) > $null${icon
 $toast = [Windows.UI.Notifications.ToastNotification]::new($template)
 [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('peon-ping').Show($toast)
 `.trim();
-      return { bin: "powershell.exe", args: ["-NoProfile", "-NonInteractive", "-Command", ps] };
+      return { bin: detectPwshBin() ?? "powershell.exe", args: ["-NoProfile", "-NonInteractive", "-Command", ps] };
     }
     default:
       return null;
