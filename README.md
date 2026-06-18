@@ -7,6 +7,8 @@
 > - **`playback_wait_seconds` config** — makes the post-`Play()` sleep configurable (default 2s vs upstream's hardcoded 3s), reducing lingering processes during rapid events.
 > - **Default `volume` raised to `1.0`** (upstream `0.5`) — peon-ping is an alert sound, and at 0.5 it's easy to miss on Windows.
 > - **Why not WPF `MediaPlayer`?** Upstream WSL uses `System.Windows.Media.MediaPlayer`, but it silently fails to render audio in `-NonInteractive -Command` background processes (no WPF Dispatcher message pump). This fork replaces it on Windows.
+> - **Custom WinForms popup** on Windows (multi-screen, icon + title + body, auto-dismiss). Upstream's corner-only Windows Toast needs a registered AUMID + Start Menu shortcut and is suppressed by Focus Assist; this fork bypasses all of that. Spawn uses `detached: false` — with `detached: true` Node creates the child via `CREATE_NEW_PROCESS_GROUP`, which breaks WinForms' desktop association (the PowerShell process runs but no window renders).
+> - **Event-aware notification content.** Upstream's popup title/body are hardcoded per event; this fork mirrors the strategy of the [original peon-ping](https://github.com/PeonPing/peon-ping): title is `<project> · <status>` with `<project>` resolved via a priority chain (pi session name → git remote repo name → folder name), and body is event-specific (assistant's last response for `task.complete`, `<tool> failed` for `task.error`, etc.). See [Desktop notification content](#desktop-notification-content).
 >
 > Install `ffplay` for the best experience: `winget install Gyan.FFmpeg`.
 >
@@ -21,13 +23,16 @@ A [pi coding agent](https://github.com/badlogic/pi-mono) extension for [peon-pin
 
 ## Features
 
-| Event | Sound category |
-|-------|---------------|
-| Session start | `session.start` — "Ready to work?" |
-| Agent starts working | `task.acknowledge` — "Work, work." |
-| Tool error | `task.error` — error sound |
-| Rapid prompts (≥3 in 10s) | `user.spam` — annoyed voice line |
-| Agent finishes | `task.complete` — completion sound + desktop notification |
+| Event | Sound category | Desktop notification |
+|-------|---------------|----------------------|
+| Session start | `session.start` — "Ready to work?" | — |
+| Agent starts working | `task.acknowledge` — "Work, work." | — |
+| Tool error | `task.error` — error sound | `error` — body names the failing tool |
+| Rapid prompts (≥3 in 10s) | `user.spam` — annoyed voice line | — |
+| Agent finishes | `task.complete` — completion sound | `done` — body shows the assistant's last response (truncated) |
+| Context compaction | `resource.limit` — limit sound | `compacting` — body: "Context compacting" |
+
+See [Desktop notification content](#desktop-notification-content) below for how title/body are built.
 
 - `/peon` opens a settings panel to toggle sounds, switch packs, adjust volume, and enable/disable individual categories
 - `/peon install` downloads the default 10 packs from the [peon-ping registry](https://peonping.github.io/registry/)
@@ -108,6 +113,34 @@ Open `/peon` settings panel to:
 | Linux | `pw-play`, `paplay`, `ffplay`, `mpv`, `play`, or `aplay` (first found) |
 | WSL | PowerShell `MediaPlayer` |
 | **Windows (native)** ⭐ | `ffplay` (recommended, `winget install Gyan.FFmpeg`) → `mpv` → `winmm.dll PlaySound` fallback (no volume control) |
+
+## Desktop notification content
+
+The popup title and body are generated per event, mirroring the strategy of the [original peon-ping](https://github.com/PeonPing/peon-ping):
+
+**Title format:** `<project> · <status>`
+
+`<project>` resolves via a priority chain:
+
+1. pi session name (`pi.getSessionName()`)
+2. git remote repo name (`git remote get-url origin`, last path segment minus `.git`)
+3. `basename(cwd)` — folder name fallback
+
+`<status>` labels the event type:
+
+| Status | Event |
+|--------|-------|
+| `done` | `agent_end` (task complete) |
+| `error` | `tool_execution_end` with `isError` |
+| `compacting` | `session_before_compact` |
+
+**Body** is event-specific:
+
+- `done` → assistant's last text response, truncated to ~120 chars at a word boundary (so the popup tells you what actually happened, not just "Task complete")
+- `error` → `<toolName> failed`
+- `compacting` → `Context compacting`
+
+On Windows the popup is a custom WinForms window (multi-screen, peon icon, auto-dismiss), not a Windows Toast — see the Fork notice at the top for rationale.
 
 ## Remote development
 
