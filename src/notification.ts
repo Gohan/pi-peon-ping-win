@@ -121,8 +121,17 @@ export function sendDesktopNotification(
   const cmd = buildNotifyCommand(notifier, title, body, opts.iconPath);
   if (!cmd) return false;
 
+  // Windows: detached must be false. With detached:true, Node creates the
+  // child with CREATE_NEW_PROCESS_GROUP, which breaks the desktop association
+  // for WinForms — the PowerShell process runs to completion but no window
+  // ever renders on the interactive desktop. Other platforms keep detached:
+  // true so short-lived notifiers (osascript/notify-send) survive parent exit.
+  const isWindows = platform === "win";
   try {
-    const child = spawn(cmd.bin, cmd.args, { stdio: "ignore", detached: true });
+    const child = spawn(cmd.bin, cmd.args, {
+      stdio: "ignore",
+      detached: !isWindows,
+    });
     child.unref();
     return true;
   } catch {
