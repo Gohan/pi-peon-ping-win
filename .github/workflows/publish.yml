@@ -17,13 +17,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # 注意:不设 registry-url。setup-node 设 registry-url 会写 .npmrc 并注入
+      # NODE_AUTH_TOKEN env,在配了该 secret 时走 token;没配时变成空字符串,
+      # 反而阻止 npm 走 OIDC(npm 优先用 .npmrc 里的 _authToken)。npm 11+ 会
+      # 自己用 OIDC 换 token,不需要预设 registry-url。
       - uses: actions/setup-node@v4
         with:
-          # Trusted Publishing 要求 Node >= 22.14.0 + npm >= 11.5.1
           node-version: '22'
-          registry-url: 'https://registry.npmjs.org'
-          # 发布构建不缓存依赖,避免缓存投毒 (setup-node v4 用 cache: '' 禁用)
-          cache: ''
+
+      # Trusted Publishing 要求 npm >= 11.5.1。Node 22 自带的是 npm 10.x,必须升级。
+      - name: Upgrade npm for Trusted Publishing
+        run: npm install -g npm@latest
+
+      - name: Print toolchain versions
+        run: |
+          node --version
+          npm --version
 
       # 安装依赖(这个包没有运行时依赖,只装 devDeps 用于 typecheck)
       - run: npm ci || npm install
@@ -32,6 +41,5 @@ jobs:
       - run: npm run typecheck --if-present
 
       # OIDC Trusted Publishing:必须加 --provenance 才会触发 npm 用 OIDC 换短期凭据,
-      # 否则 npm 会尝试用空的 NODE_AUTH_TOKEN 发布,得到 404。
       # 见 https://docs.npmjs.com/generating-provenance-statements
       - run: npm publish --access public --provenance
