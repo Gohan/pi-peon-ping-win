@@ -81,6 +81,25 @@ Open the settings panel:
 /peon
 ```
 
+### Installing specific packs
+
+`/peon install` without arguments installs the 10 default packs. To install one or more specific packs, pass their names:
+
+```
+/peon install peon_ru
+/peon install peon_ru glados duke_nukem
+```
+
+Pack names come from the public [peon-ping registry](https://peonping.github.io/registry/index.json). Browse all 46+ packs (Warcraft, StarCraft, Portal, Red Alert, Dota 2, etc.) with previews at **[openpeon.com/packs](https://openpeon.com/packs)** — each pack's `name` field is what you pass to `/peon install`.
+
+### Switching packs at runtime
+
+Open `/peon` settings panel to:
+- Switch the active pack
+- Adjust volume
+- Enable/disable individual sound categories (session start, task complete, etc.)
+- Browse packs with audio preview as you scroll
+
 ## Platform support
 
 | Platform | Player |

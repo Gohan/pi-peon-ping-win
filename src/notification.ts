@@ -218,7 +218,7 @@ foreach ($screen in $screens) {
 foreach ($f in $forms) { $f.Show() | Out-Null }
 
 $timer = New-Object System.Windows.Forms.Timer
-$timer.Interval = 4000
+$timer.Interval = 10000
 $timer.Add_Tick({
     foreach ($f in $forms) { $f.Close() }
     [System.Windows.Forms.Application]::Exit()
