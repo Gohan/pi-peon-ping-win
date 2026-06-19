@@ -23,7 +23,7 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 ### Changed
 
 - Migrated pi package dependencies from `@mariozechner/*` to `@earendil-works/*` — the pi project renamed its packages and the old npm names are deprecated (`@mariozechner/pi-coding-agent` stays at 0.73.1 and no longer receives updates)
-  - `package.json` peerDependencies: `@earendil-works/pi-coding-agent >=0.79.0`, `@earendil-works/pi-tui >=0.79.0`
+  - `package.json` peerDependencies: `@earendil-works/pi-coding-agent >=0.74.0`, `@earendil-works/pi-tui >=0.74.0` (covers every published `@earendil-works/*` release — all 21 versions from 0.74.0 to 0.79.7 expose the APIs we use: `getSessionName`, `BeforeAgentStartEvent.prompt`, `session_before_compact`, `keyHint`)
   - All TypeScript imports across `src/` updated accordingly
 - Switched test framework from `bun:test` to [vitest](https://vitest.dev) — API-compatible (`describe`/`it`/`expect`/`vi.spyOn`/`vi.fn`). The project never actually used bun locally; `bun.lock` was inherited from upstream and `npm` + `package-lock.json` is the real workflow
 - Switched CI (lint + test workflows) from `oven-sh/setup-bun` to `actions/setup-node` + `npm ci`, matching the local toolchain

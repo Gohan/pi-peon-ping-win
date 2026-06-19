@@ -18,7 +18,7 @@ A [pi coding agent](https://github.com/earendil-works/pi) extension for [peon-pi
 
 ## Requirements
 
-- [pi](https://github.com/earendil-works/pi) >= 0.79.0
+- [pi](https://github.com/earendil-works/pi) >= 0.74.0
 - An audio player on your system (see [Platform support](#platform-support))
 
 ## Features
