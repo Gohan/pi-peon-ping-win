@@ -7,7 +7,7 @@
  * /peon opens a settings panel. /peon install downloads packs.
  */
 
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { playCategorySound, sendNotification } from "./audio";
 import { ensureDirs, loadConfig, loadState, saveState } from "./config";
 import { buildNotifyContent, extractLastAssistantText, extractToolErrorText, resolveProjectName } from "./notify-content";

@@ -1,12 +1,12 @@
-import { describe, it, expect, spyOn, mock } from "bun:test";
+import { describe, it, expect, vi } from "vitest";
 import { DEFAULT_CONFIG } from "../src/constants";
 import type { PeonConfig } from "../src/types";
 
 // Mock the notification module so tests never spawn real processes.
 // All tests that import ../src/audio with a mocked notification module
-// must live in this file — bun's mock.module leaks across parallel files.
-const mockSendDesktop = mock(() => false);
-mock.module("../src/notification", () => ({
+// must live in this file — vitest's vi.mock leaks across parallel files.
+const mockSendDesktop = vi.fn(() => false);
+vi.mock("../src/notification", () => ({
   sendDesktopNotification: mockSendDesktop,
   resolveIcon: () => "/fake/icon.png",
   DEFAULT_ICON_PATH: "/fake/icon.png",
@@ -16,7 +16,7 @@ const { sendNotification } = await import("../src/audio");
 
 describe("sendNotification", () => {
   it("does not write OSC escape sequences", () => {
-    const writeSpy = spyOn(process.stdout, "write");
+    const writeSpy = vi.spyOn(process.stdout, "write");
     try {
       mockSendDesktop.mockReturnValue(false);
       const config: PeonConfig = { ...DEFAULT_CONFIG, relay_mode: "local" };

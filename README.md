@@ -14,11 +14,11 @@
 >
 > All credit for the original work goes to [joshuadavidthomas](https://github.com/joshuadavidthomas).
 
-A [pi coding agent](https://github.com/badlogic/pi-mono) extension for [peon-ping](https://github.com/PeonPing/peon-ping) sound notifications. Plays themed audio clips on lifecycle events using [OpenPeon](https://github.com/PeonPing/og-packs) sound packs (Warcraft III Peon, GLaDOS, Duke Nukem, StarCraft, and more).
+A [pi coding agent](https://github.com/earendil-works/pi) extension for [peon-ping](https://github.com/PeonPing/peon-ping) sound notifications. Plays themed audio clips on lifecycle events using [OpenPeon](https://github.com/PeonPing/og-packs) sound packs (Warcraft III Peon, GLaDOS, Duke Nukem, StarCraft, and more).
 
 ## Requirements
 
-- [pi](https://github.com/badlogic/pi-mono) >= 0.50.0
+- [pi](https://github.com/earendil-works/pi) >= 0.79.0
 - An audio player on your system (see [Platform support](#platform-support))
 
 ## Features
@@ -40,7 +40,7 @@ See [Desktop notification content](#desktop-notification-content) below for how 
 
 ## Installation
 
-Install as a [pi package](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/packages.md) globally:
+Install as a [pi package](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md) globally:
 
 ```bash
 pi install npm:pi-peon-ping
@@ -171,10 +171,10 @@ Edit `~/.config/peon-ping/config.json` or use the `/peon` settings panel:
 ## Development
 
 ```bash
-bun install            # Install dependencies
-bun run test           # Run tests
-bun run test:watch     # Run tests in watch mode
-bun run typecheck      # Type check
+npm install           # Install dependencies
+npm test              # Run tests
+npm run test:watch    # Run tests in watch mode
+npm run typecheck     # Type check
 ```
 
 To test the extension locally without conflicting with a globally installed copy:

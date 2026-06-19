@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "bun:test";
+import { describe, it, expect, beforeEach } from "vitest";
 
 describe("config parity with upstream peon-ping", () => {
   describe("PeonConfig type has all upstream fields", () => {
@@ -81,6 +81,8 @@ describe("config parity with upstream peon-ping", () => {
           handlers[event] = handler;
         },
         registerCommand: () => {},
+        getSessionName: () => undefined,
+        getFlag: () => undefined,
       };
     });
 

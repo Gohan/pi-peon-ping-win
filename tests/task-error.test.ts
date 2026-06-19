@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "bun:test";
+import { describe, it, expect, beforeEach } from "vitest";
 
 import { playCategorySound } from "../src/audio";
 import { DEFAULT_CONFIG, DEFAULT_STATE } from "../src/constants";
@@ -44,6 +44,8 @@ describe("task.error event handling", () => {
           handlers[event] = handler;
         },
         registerCommand: () => {},
+        getSessionName: () => undefined,
+        getFlag: () => undefined,
       };
     });
 
@@ -91,7 +93,7 @@ describe("task.error event handling", () => {
       // gracefully since no packs are installed in the test environment
       await handler(
         { type: "tool_execution_end", toolCallId: "t-3", toolName: "bash", result: "fail", isError: true },
-        { hasUI: true },
+        { hasUI: true, cwd: "/tmp/test", ui: { notify: () => {} } },
       );
     });
   });

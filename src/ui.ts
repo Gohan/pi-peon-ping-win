@@ -1,4 +1,5 @@
-import { DynamicBorder, getSettingsListTheme, keyHint } from "@mariozechner/pi-coding-agent";
+import { DynamicBorder, getSettingsListTheme, keyHint } from "@earendil-works/pi-coding-agent";
+import type { Keybinding } from "@earendil-works/pi-tui";
 import {
   CancellableLoader,
   Container,
@@ -8,7 +9,7 @@ import {
   SelectList,
   Spacer,
   Text,
-} from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-tui";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { killPreviousSound, playSound } from "./audio";
@@ -193,7 +194,10 @@ export async function runInstall(
       container.addChild(loader);
 
       container.addChild(new Spacer(1));
-      container.addChild(new Text(keyHint("tui.select.cancel", "cancel"), 1, 0));
+      // Cast: "tui.select.cancel" exists in pi-tui's Keybindings interface, but the
+      // shape drifted between pi-tui versions, breaking typecheck under newer
+      // releases. The string is stable at runtime; bypass the type check.
+      container.addChild(new Text(keyHint("tui.select.cancel" as Keybinding, "cancel"), 1, 0));
       container.addChild(new Spacer(1));
       container.addChild(new DynamicBorder(borderColor));
 

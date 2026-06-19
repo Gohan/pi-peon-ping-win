@@ -1,4 +1,4 @@
-import { describe, it, expect } from "bun:test";
+import { describe, it, expect } from "vitest";
 import { detectPlatform, type Platform } from "../src/platform";
 import { platform as osPlatform } from "node:os";
 

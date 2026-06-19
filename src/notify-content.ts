@@ -16,8 +16,8 @@
 
 import { basename } from "node:path";
 import { execSync } from "node:child_process";
-import type { AgentMessage } from "@mariozechner/pi-agent-core";
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { AgentMessage } from "@earendil-works/pi-agent-core";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 /** Maximum characters of the assistant's last response to show in the body. */
 const MAX_SUMMARY_CHARS = 120;
