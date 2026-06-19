@@ -10,7 +10,7 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { playCategorySound, sendNotification } from "./audio";
 import { ensureDirs, loadConfig, loadState, saveState } from "./config";
-import { buildNotifyContent, extractLastAssistantText, resolveProjectName } from "./notify-content";
+import { buildNotifyContent, extractLastAssistantText, extractToolErrorText, resolveProjectName } from "./notify-content";
 import { listPacks } from "./packs";
 import { checkRelayHealth, detectRemoteSession, getRelayUrl, relaySetupInstructions } from "./relay";
 import { createSettingsPanel, runInstall } from "./ui";
@@ -88,7 +88,12 @@ export default function (pi: ExtensionAPI) {
 
     if (config.enabled && !state.paused && config.desktop_notifications) {
       const project = resolveProjectName(ctx.cwd, pi);
-      const { title, body } = buildNotifyContent("error", project, `${event.toolName} failed`);
+      // body: [toolName]: <真实错误内容>。错误内容来自 result.content
+      // (bash = stdout+stderr+exit code,其它工具 = 抛出的 error message),
+      // 截断到 120 字符。拿不到内容时回退到 "failed"。
+      const errText = extractToolErrorText(event.result);
+      const detail = errText || "failed";
+      const { title, body } = buildNotifyContent("error", project, `[${event.toolName}]: ${detail}`);
       sendNotification(
         title,
         body,

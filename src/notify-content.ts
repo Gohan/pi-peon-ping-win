@@ -105,6 +105,33 @@ export function extractLastAssistantText(messages: AgentMessage[] | undefined): 
   return "";
 }
 
+/**
+ * Extract error text from a ToolExecutionEndEvent.result.
+ *
+ * pi-agent-core normalizes tool errors into:
+ *   { content: [{ type: 'text', text: <errorMessage> }], details: {} }
+ * For the bash tool, <errorMessage> is the combined stdout + stderr +
+ * "Command exited with code N". For other tools it's the thrown error
+ * message. We concatenate all text blocks and truncate.
+ */
+export function extractToolErrorText(result: unknown): string {
+  if (!result || typeof result !== "object") return "";
+  const content = (result as { content?: unknown }).content;
+  if (!Array.isArray(content)) return "";
+
+  const text = content
+    .filter((block): block is { type: "text"; text: string } =>
+      typeof block === "object" &&
+      block !== null &&
+      (block as { type?: string }).type === "text")
+    .map((block) => block.text)
+    .join("\n")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return text ? truncate(text, MAX_SUMMARY_CHARS) : "";
+}
+
 function truncate(s: string, max: number): string {
   if (s.length <= max) return s;
   // Try to cut at a word boundary near the limit

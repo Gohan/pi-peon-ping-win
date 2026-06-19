@@ -165,14 +165,66 @@ function buildWinFormsCommand(
 
   // PowerShell template. Single-quoted strings inside; we interpolate only
   // safe values from above.
+  //
+  // Layout notes (verified via popup-test/v2-new-layout.ps1):
+  //   - form 720x220 (was 580x180): wider text area shows more content,
+  //     taller form fits 3 lines of body without crowding the bottom edge
+  //   - font: SystemFonts.DefaultFont family (NOT hardcoded 'Segoe UI')
+  //     Segoe UI has no CJK glyphs; Windows falls back to YaHei UI whose
+  //     ascent metrics differ, causing the top of Chinese characters to be
+  //     clipped when the Label sizes itself by the Segoe UI metrics.
+  //   - TextAlign: TopLeft (NOT MiddleLeft). MiddleLeft relies on
+  //     TextRenderer.MeasureText which under-measures on .NET 5+
+  //     (dotnet/winforms#8368), pushing text up and clipping the top.
+  //   - body height: measured via TextRenderer.MeasureText on a 3-line probe
+  //     rather than Font.GetHeight*3 — GetHeight underestimates line spacing
+  //     and only 2 lines would render in the nominal 3-line box.
+  //   - AutoEllipsis on body: if the assistant summary exceeds 3 lines,
+  //     WinForms appends "…" instead of overflowing.
   const ps = `Add-Type -AssemblyName System.Windows.Forms,System.Drawing
 
 $iconPath = '${safeIconPath}'
 $hasIcon = ($iconPath -ne '') -and (Test-Path $iconPath)
+
+# Font: system default UI font family. On Chinese Windows this is Microsoft
+# YaHei UI (has CJK glyphs with consistent metrics); on English Windows it
+# is Segoe UI. Hardcoding 'Segoe UI' forces a font-link fallback for CJK
+# whose ascent metrics differ, clipping the top of Chinese characters.
+$uiFontFamily = [System.Drawing.SystemFonts]::DefaultFont.FontFamily
+$titleFont = New-Object System.Drawing.Font($uiFontFamily, 24, [System.Drawing.FontStyle]::Bold)
+$bodyFont  = New-Object System.Drawing.Font($uiFontFamily, 14)
+
+# Layout (verified — see buildWinFormsCommand comment in notification.ts)
+$formWidth  = 720
+$formHeight = 220
+$iconSize   = 100
+$iconX      = 24
+$textX      = $(if ($hasIcon) { $iconX + $iconSize + 20 } else { $iconX })
+$textWidth  = $formWidth - $textX - 24
+$topPad     = 28
+$gap        = 8
+$titleHeight = 56
+
+# Measure actual 3-line body height with the chosen font + width. Font.
+# GetHeight*3 underestimates (ignores line spacing); measuring a 3-line
+# probe is the only reliable way to guarantee 3 lines actually render.
+$probe = "line1" + [char]10 + "line2" + [char]10 + "line3"
+$probeSize = [System.Windows.Forms.TextRenderer]::MeasureText(
+    $probe, $bodyFont,
+    (New-Object System.Drawing.Size($textWidth, [int]::MaxValue)),
+    [System.Windows.Forms.TextFormatFlags]::WordBreak -bor [System.Windows.Forms.TextFormatFlags]::NoPrefix
+)
+$bodyHeight = [int]$probeSize.Height + 16
+
+# Vertical positions: title at top, body below, icon centered on the block
+$label1Y = $topPad
+$label2Y = $topPad + $titleHeight + $gap
+$textBlockH = $titleHeight + $gap + $bodyHeight
+$iconY = $topPad + [int](($textBlockH - $iconSize) / 2)
+if ($iconY -lt 20) { $iconY = 20 }
+
 $screens = [System.Windows.Forms.Screen]::AllScreens
 $forms = New-Object System.Collections.ArrayList
-$formWidth = 580
-$formHeight = 180
 
 foreach ($screen in $screens) {
     $form = New-Object System.Windows.Forms.Form
@@ -191,33 +243,31 @@ foreach ($screen in $screens) {
 
     if ($hasIcon) {
         $pictureBox = New-Object System.Windows.Forms.PictureBox
-        $pictureBox.Location = New-Object System.Drawing.Point(20, 40)
-        $pictureBox.Size = New-Object System.Drawing.Size(100, 100)
+        $pictureBox.Location = New-Object System.Drawing.Point($iconX, $iconY)
+        $pictureBox.Size = New-Object System.Drawing.Size($iconSize, $iconSize)
         $pictureBox.SizeMode = [System.Windows.Forms.PictureBoxSizeMode]::Zoom
         $pictureBox.Image = [System.Drawing.Image]::FromFile($iconPath)
         $form.Controls.Add($pictureBox)
     }
 
-    $textX = $(if ($hasIcon) { 140 } else { 20 })
-    $textWidth = $(if ($hasIcon) { 420 } else { 540 })
-
     $label1 = New-Object System.Windows.Forms.Label
     $label1.Text = '${title.replace(/'/g, "''")}'
-    $label1.Font = New-Object System.Drawing.Font('Segoe UI', 24, [System.Drawing.FontStyle]::Bold)
+    $label1.Font = $titleFont
     $label1.ForeColor = [System.Drawing.Color]::White
     $label1.AutoSize = $false
-    $label1.Size = New-Object System.Drawing.Size($textWidth, 60)
-    $label1.TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
-    $label1.Location = New-Object System.Drawing.Point($textX, 30)
+    $label1.Size = New-Object System.Drawing.Size($textWidth, $titleHeight)
+    $label1.TextAlign = [System.Drawing.ContentAlignment]::TopLeft
+    $label1.Location = New-Object System.Drawing.Point($textX, $label1Y)
 
     $label2 = New-Object System.Windows.Forms.Label
     $label2.Text = '${body.replace(/'/g, "''")}'
-    $label2.Font = New-Object System.Drawing.Font('Segoe UI', 14)
+    $label2.Font = $bodyFont
     $label2.ForeColor = [System.Drawing.Color]::LightGray
     $label2.AutoSize = $false
-    $label2.Size = New-Object System.Drawing.Size($textWidth, 40)
-    $label2.TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
-    $label2.Location = New-Object System.Drawing.Point($textX, 100)
+    $label2.Size = New-Object System.Drawing.Size($textWidth, $bodyHeight)
+    $label2.TextAlign = [System.Drawing.ContentAlignment]::TopLeft
+    $label2.AutoEllipsis = $true
+    $label2.Location = New-Object System.Drawing.Point($textX, $label2Y)
 
     $form.Controls.Add($label1)
     $form.Controls.Add($label2)
