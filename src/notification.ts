@@ -200,7 +200,7 @@ function buildWinFormsCommand(
   //   - NoActivateForm overrides ShowWithoutActivation -> popup doesn't steal
   //     keyboard focus; TopMost still keeps it visually on top
   //   - background color by status, mirroring upstream peon-ping notify.sh
-  //     (done=blue 30,80,180 / error=red 180,0,0 / compacting=yellow 200,160,0)
+  //     (done=blue 30,80,180 / error=red 180,0,0 / compacted=yellow 200,160,0)
   const ps = `Add-Type -AssemblyName System.Windows.Forms,System.Drawing
 
 # Form subclass that shows without stealing keyboard focus. TopMost keeps
@@ -221,18 +221,18 @@ $hasIcon = ($iconPath -ne '') -and (Test-Path $iconPath)
 # notify.sh WinForms renderer (scripts/notify.sh lines 554-558):
 #   done       -> blue   (30, 80, 180)
 #   error      -> red    (180, 0, 0)
-#   compacting -> yellow (200, 160, 0)
+#   compacted  -> yellow (200, 160, 0)
 # Unknown/missing falls back to the original neutral dark.
 $status = '${status ?? ""}'
 switch ($status) {
     'done'       { $bgColor = [System.Drawing.Color]::FromArgb(30, 80, 180) }
     'error'      { $bgColor = [System.Drawing.Color]::FromArgb(180, 0, 0) }
-    'compacting' { $bgColor = [System.Drawing.Color]::FromArgb(200, 160, 0) }
+    'compacted'  { $bgColor = [System.Drawing.Color]::FromArgb(200, 160, 0) }
     default      { $bgColor = [System.Drawing.Color]::FromArgb(30, 30, 40) }
 }
 
 # Prompt line (optional). agent_end / tool_execution_end pass the user's
-# last message; session_before_compact leaves it empty.
+# last message; session_compact leaves it empty.
 $promptText = '${safePromptLine}'
 $hasPrompt = $promptText -ne ''
 

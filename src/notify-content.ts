@@ -5,7 +5,7 @@
  *
  * - Title: "<project> · <status>" where <project> comes from a priority
  *   chain (session name > git remote > folder name), and <status> is a
- *   short label describing the event type (done / error / compacting).
+ *   short label describing the event type (done / error / compacted).
  *   This replaces the old hardcoded "pi · <folder>" + "Task complete".
  *
  * - Body: event-specific. For task completion we extract the assistant's
@@ -141,13 +141,13 @@ function truncate(s: string, max: number): string {
 }
 
 /** Event types that produce a distinct notification status/title suffix. */
-export type NotifyStatus = "done" | "error" | "compacting";
+export type NotifyStatus = "done" | "error" | "compacted";
 
 /** Human-readable status label for the title. */
 const STATUS_LABEL: Record<NotifyStatus, string> = {
   done: "done",
   error: "error",
-  compacting: "compacting",
+  compacted: "compacted",
 };
 
 export interface NotifyContent {
@@ -161,7 +161,7 @@ export interface NotifyContent {
  *
  * title: "<project> · <status>"
  * body:  event-specific (assistant summary for done, tool name for error,
- *        fixed text for compacting).
+ *        fixed text for compacted).
  */
 export function buildNotifyContent(
   status: NotifyStatus,
@@ -178,7 +178,7 @@ export function buildNotifyContent(
   } else if (status === "error") {
     body = "Tool failed";
   } else {
-    body = "Context compacting";
+    body = "Context compacted";
   }
 
   return { title, body, status };

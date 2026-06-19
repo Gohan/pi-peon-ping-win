@@ -30,7 +30,7 @@ A [pi coding agent](https://github.com/earendil-works/pi) extension for [peon-pi
 | Tool error | `task.error` — error sound | `error` — body names the failing tool |
 | Rapid prompts (≥3 in 10s) | `user.spam` — annoyed voice line | — |
 | Agent finishes | `task.complete` — completion sound | `done` — body shows the assistant's last response (truncated) |
-| Context compaction | `resource.limit` — limit sound | `compacting` — body: "Context compacting" |
+| Context compaction | `resource.limit` — limit sound | `compacted` — body: "Context compacted" |
 
 See [Desktop notification content](#desktop-notification-content) below for how title/body are built.
 
@@ -132,13 +132,13 @@ The popup title and body are generated per event, mirroring the strategy of the 
 |--------|-------|
 | `done` | `agent_end` (task complete) |
 | `error` | `tool_execution_end` with `isError` |
-| `compacting` | `session_before_compact` |
+| `compacted` | `session_compact` (fired AFTER compaction completes, not before — the before event can be cancelled by other handlers, so firing on `session_before_compact` would notify on cancellations too) |
 
 **Body** is event-specific:
 
 - `done` → assistant's last text response, truncated to ~120 chars at a word boundary (so the popup tells you what actually happened, not just "Task complete")
 - `error` → `<toolName> failed`
-- `compacting` → `Context compacting`
+- `compacted` → `Context compacted`
 
 On Windows the popup is a custom WinForms window (multi-screen, peon icon, auto-dismiss), not a Windows Toast — see the Fork notice at the top for rationale.
 

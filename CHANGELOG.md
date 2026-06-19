@@ -20,6 +20,10 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 ## [Unreleased]
 
+### Fixed
+
+- Compaction popup now fires on `session_compact` (after compaction completes) instead of `session_before_compact` (the preparation phase). The before-event is an interception point that other handlers can cancel via `{ cancel: true }`, so the old timing would announce "Context compacting" even when compaction was ultimately aborted. Status renamed `compacting` → `compacted`; body rewritten to `Context compacted`. Color stays yellow.
+
 ### Changed
 
 - Migrated pi package dependencies from `@mariozechner/*` to `@earendil-works/*` — the pi project renamed its packages and the old npm names are deprecated (`@mariozechner/pi-coding-agent` stays at 0.73.1 and no longer receives updates)

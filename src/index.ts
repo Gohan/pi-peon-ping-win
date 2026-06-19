@@ -150,7 +150,7 @@ export default function (pi: ExtensionAPI) {
 
   // Context window filling up — compaction about to start. Mirrors upstream
   // peon-ping's PreCompact → resource.limit mapping.
-  pi.on("session_before_compact", async (_event, ctx) => {
+  pi.on("session_compact", async (_event, ctx) => {
     config = loadConfig();
     state = loadState();
     if (!shouldPlaySounds(ctx)) return;
@@ -159,13 +159,13 @@ export default function (pi: ExtensionAPI) {
 
     if (config.enabled && !state.paused && config.desktop_notifications) {
       const project = resolveProjectName(ctx.cwd, pi);
-      const { title, body } = buildNotifyContent("compacting", project);
+      const { title, body } = buildNotifyContent("compacted", project);
       sendNotification(
         title,
         body,
         config,
         ctx.hasUI ? ctx.ui.notify.bind(ctx.ui) : undefined,
-        "compacting",
+        "compacted",
       );
     }
   });
