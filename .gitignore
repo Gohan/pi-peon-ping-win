@@ -42,5 +42,5 @@ Thumbs.db
 *.tgz
 
 # Lock files (bun.lock tracked)
-package-lock.json
+# package-lock.json tracked too — npm is the local toolchain
 yarn.lock
