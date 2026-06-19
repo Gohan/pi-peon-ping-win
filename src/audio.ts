@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { detectLinuxPlayer, detectPlatform, detectPwshBin, detectWindowsPlayer, type Platform } from "./platform";
 import { saveState } from "./config";
 import { resolveIcon, sendDesktopNotification } from "./notification";
+import type { NotifyStatus } from "./notify-content";
 import { getPacksDir, pickSound } from "./packs";
 import { getRelayUrl, relayPlayCategory, relayNotify } from "./relay";
 import type { PeonConfig, PeonState } from "./types";
@@ -165,6 +166,8 @@ export function sendNotification(
   body: string,
   config: PeonConfig,
   uiNotify?: UiNotify,
+  status?: NotifyStatus,
+  promptLine?: string,
 ): void {
   if (!config.desktop_notifications) return;
 
@@ -176,7 +179,7 @@ export function sendNotification(
 
   const packPath = join(getPacksDir(), config.default_pack);
   const iconPath = resolveIcon(packPath);
-  const sent = sendDesktopNotification(title, body, { iconPath });
+  const sent = sendDesktopNotification(title, body, { iconPath, status, promptLine });
   if (!sent && uiNotify) {
     uiNotify(`${title}: ${body}`, "info");
   }

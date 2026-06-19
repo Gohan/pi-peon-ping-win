@@ -20,6 +20,10 @@ export default function (pi: ExtensionAPI) {
   let config = loadConfig();
   let state = loadState();
   let installing = false;
+  // Current user prompt, refreshed on before_agent_start and shown in the
+  // popup's prompt row ("> " prefixed) for agent_end / tool_execution_end.
+  // Truncated to a single-line-friendly length; the popup itself AutoEllipses.
+  let currentPrompt = "";
 
   const hasPacks = () => listPacks().length > 0;
 
@@ -28,6 +32,12 @@ export default function (pi: ExtensionAPI) {
     const relayUrl = getRelayUrl(config.relay_mode);
     return relayUrl !== null || hasPacks();
   };
+
+  // Capture the user's prompt each turn so agent_end / tool_execution_end
+  // popups can echo it in the prompt row.
+  pi.on("before_agent_start", async (event) => {
+    currentPrompt = (event.prompt || "").slice(0, 200);
+  });
 
   pi.on("session_start", async (_event, ctx) => {
     if (!ctx.hasUI) return;
@@ -99,6 +109,8 @@ export default function (pi: ExtensionAPI) {
         body,
         config,
         ctx.hasUI ? ctx.ui.notify.bind(ctx.ui) : undefined,
+        "error",
+        currentPrompt,
       );
     }
   });
@@ -130,6 +142,8 @@ export default function (pi: ExtensionAPI) {
         body,
         config,
         ctx.hasUI ? ctx.ui.notify.bind(ctx.ui) : undefined,
+        "done",
+        currentPrompt,
       );
     }
   });
@@ -151,6 +165,7 @@ export default function (pi: ExtensionAPI) {
         body,
         config,
         ctx.hasUI ? ctx.ui.notify.bind(ctx.ui) : undefined,
+        "compacting",
       );
     }
   });

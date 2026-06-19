@@ -2,6 +2,7 @@ import { spawn, execSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { DATA_DIR } from "./constants";
+import type { NotifyStatus } from "./notify-content";
 import { detectPlatform, detectPwshBin, type Platform } from "./platform";
 
 export const DEFAULT_ICON_PATH = join(DATA_DIR, "peon-icon.png");
@@ -61,6 +62,8 @@ export function buildNotifyCommand(
   title: string,
   body: string,
   iconPath?: string,
+  status?: NotifyStatus,
+  promptLine?: string,
 ): NotifyCommand | null {
   const safeTitle = escapeNotificationText(title);
   const safeBody = escapeNotificationText(body);
@@ -77,7 +80,7 @@ export function buildNotifyCommand(
       return { bin: "notify-send", args };
     }
     case "winforms": {
-      return buildWinFormsCommand(safeTitle, safeBody, iconPath);
+      return buildWinFormsCommand(safeTitle, safeBody, iconPath, status, promptLine);
     }
     case "powershell": {
       let iconXml = "";
@@ -104,6 +107,8 @@ $toast = [Windows.UI.Notifications.ToastNotification]::new($template)
 export interface NotifyOptions {
   platform?: Platform;
   iconPath?: string;
+  status?: NotifyStatus;
+  promptLine?: string;
 }
 
 export function sendDesktopNotification(
@@ -118,7 +123,7 @@ export function sendDesktopNotification(
   const notifier = detectNotifier(platform);
   if (!notifier) return false;
 
-  const cmd = buildNotifyCommand(notifier, title, body, opts.iconPath);
+  const cmd = buildNotifyCommand(notifier, title, body, opts.iconPath, opts.status, opts.promptLine);
   if (!cmd) return false;
 
   // Windows: detached must be false. With detached:true, Node creates the
@@ -157,11 +162,14 @@ function buildWinFormsCommand(
   title: string,
   body: string,
   iconPath?: string,
+  status?: NotifyStatus,
+  promptLine?: string,
 ): NotifyCommand {
   // Paths into PowerShell single-quoted strings: escape ' as ''
   const psSingle = (s: string) => s.replace(/'/g, "''");
   const iconWinPath = iconPath ? iconPath.replace(/\//g, "\\") : "";
   const safeIconPath = psSingle(iconWinPath);
+  const safePromptLine = promptLine ? psSingle(promptLine) : "";
 
   // PowerShell template. Single-quoted strings inside; we interpolate only
   // safe values from above.
@@ -181,45 +189,117 @@ function buildWinFormsCommand(
   //     and only 2 lines would render in the nominal 3-line box.
   //   - AutoEllipsis on body: if the assistant summary exceeds 3 lines,
   //     WinForms appends "…" instead of overflowing.
+  // Layout (verified via tmp/popup-test/v3-layout.ps1):
+  //   - form 920 wide -> textWidth ~752 (36% more chars/line than the 580 form)
+  //   - three rows when promptLine is set: title / prompt(1 line) / body(3 lines);
+  //     two rows when absent: title / body (prompt section collapses to 0)
+  //   - row heights come from TextRenderer.MeasureText, not hardcoded constants —
+  //     AutoEllipsis only draws the ellipsis glyph when Size.Height >= the
+  //     EndEllipsis probe height; under-sizing silently drops the text entirely
+  //   - prompt prefixed with "> " (markdown-quote styling)
+  //   - NoActivateForm overrides ShowWithoutActivation -> popup doesn't steal
+  //     keyboard focus; TopMost still keeps it visually on top
+  //   - background color by status, mirroring upstream peon-ping notify.sh
+  //     (done=blue 30,80,180 / error=red 180,0,0 / compacting=yellow 200,160,0)
   const ps = `Add-Type -AssemblyName System.Windows.Forms,System.Drawing
+
+# Form subclass that shows without stealing keyboard focus. TopMost keeps
+# it visually on top; ShowWithoutActivation keeps focus on the user's window.
+if (-not ("NoActivateForm" -as [type])) {
+    Add-Type -ReferencedAssemblies System.Windows.Forms @'
+using System.Windows.Forms;
+public class NoActivateForm : Form {
+    protected override bool ShowWithoutActivation { get { return true; } }
+}
+'@
+}
 
 $iconPath = '${safeIconPath}'
 $hasIcon = ($iconPath -ne '') -and (Test-Path $iconPath)
 
-# Font: system default UI font family. On Chinese Windows this is Microsoft
-# YaHei UI (has CJK glyphs with consistent metrics); on English Windows it
-# is Segoe UI. Hardcoding 'Segoe UI' forces a font-link fallback for CJK
-# whose ascent metrics differ, clipping the top of Chinese characters.
-$uiFontFamily = [System.Drawing.SystemFonts]::DefaultFont.FontFamily
-$titleFont = New-Object System.Drawing.Font($uiFontFamily, 24, [System.Drawing.FontStyle]::Bold)
-$bodyFont  = New-Object System.Drawing.Font($uiFontFamily, 14)
+# Background color by event status. RGB values mirror upstream peon-ping's
+# notify.sh WinForms renderer (scripts/notify.sh lines 554-558):
+#   done       -> blue   (30, 80, 180)
+#   error      -> red    (180, 0, 0)
+#   compacting -> yellow (200, 160, 0)
+# Unknown/missing falls back to the original neutral dark.
+$status = '${status ?? ""}'
+switch ($status) {
+    'done'       { $bgColor = [System.Drawing.Color]::FromArgb(30, 80, 180) }
+    'error'      { $bgColor = [System.Drawing.Color]::FromArgb(180, 0, 0) }
+    'compacting' { $bgColor = [System.Drawing.Color]::FromArgb(200, 160, 0) }
+    default      { $bgColor = [System.Drawing.Color]::FromArgb(30, 30, 40) }
+}
 
-# Layout (verified — see buildWinFormsCommand comment in notification.ts)
-$formWidth  = 720
-$formHeight = 220
+# Prompt line (optional). agent_end / tool_execution_end pass the user's
+# last message; session_before_compact leaves it empty.
+$promptText = '${safePromptLine}'
+$hasPrompt = $promptText -ne ''
+
+# Fonts: system default UI family. Hardcoding 'Segoe UI' forces a font-link
+# fallback for CJK whose ascent metrics differ, clipping the top of Chinese
+# characters (Flow-Launcher/Flow.Launcher#4373).
+$uiFontFamily = [System.Drawing.SystemFonts]::DefaultFont.FontFamily
+$titleFont  = New-Object System.Drawing.Font($uiFontFamily, 24, [System.Drawing.FontStyle]::Bold)
+$promptFont = New-Object System.Drawing.Font($uiFontFamily, 14)
+$bodyFont   = New-Object System.Drawing.Font($uiFontFamily, 14)
+
+# Layout constants
+$formWidth  = 920
 $iconSize   = 100
 $iconX      = 24
-$textX      = $(if ($hasIcon) { $iconX + $iconSize + 20 } else { $iconX })
+$textX      = $iconX + $iconSize + 20
 $textWidth  = $formWidth - $textX - 24
-$topPad     = 28
-$gap        = 8
-$titleHeight = 56
+$topPad     = 24
+$gapTitle   = 8        # title -> prompt
+$gapPrompt  = 16       # prompt -> body (larger, visual separation)
+$bottomPad  = 24
 
-# Measure actual 3-line body height with the chosen font + width. Font.
-# GetHeight*3 underestimates (ignores line spacing); measuring a 3-line
-# probe is the only reliable way to guarantee 3 lines actually render.
-$probe = "line1" + [char]10 + "line2" + [char]10 + "line3"
-$probeSize = [System.Windows.Forms.TextRenderer]::MeasureText(
-    $probe, $bodyFont,
+# All row heights measured by the system, not hardcoded. AutoEllipsis only
+# renders the ellipsis glyph when Size.Height >= what DrawText(EndEllipsis)
+# asks for; under-sizing silently drops the text (the exact bug we hit when
+# prompt Height was hardcoded to 28).
+$titleProbe = [System.Windows.Forms.TextRenderer]::MeasureText(
+    'Ag中文', $titleFont,
+    (New-Object System.Drawing.Size([int]::MaxValue, [int]::MaxValue)),
+    [System.Windows.Forms.TextFormatFlags]::NoPrefix)
+$titleHeight = [int]$titleProbe.Height + 8
+
+$bodyProbeText = "line1" + [char]10 + "line2" + [char]10 + "line3"
+$bodyProbe = [System.Windows.Forms.TextRenderer]::MeasureText(
+    $bodyProbeText, $bodyFont,
     (New-Object System.Drawing.Size($textWidth, [int]::MaxValue)),
-    [System.Windows.Forms.TextFormatFlags]::WordBreak -bor [System.Windows.Forms.TextFormatFlags]::NoPrefix
-)
-$bodyHeight = [int]$probeSize.Height + 16
+    [System.Windows.Forms.TextFormatFlags]::WordBreak -bor [System.Windows.Forms.TextFormatFlags]::NoPrefix)
+$bodyHeight = [int]$bodyProbe.Height + 20   # +20 ensures 3 lines actually render
 
-# Vertical positions: title at top, body below, icon centered on the block
-$label1Y = $topPad
-$label2Y = $topPad + $titleHeight + $gap
-$textBlockH = $titleHeight + $gap + $bodyHeight
+# Prompt section height is 0 when no prompt — collapses layout to title/body.
+$promptHeight = 0
+if ($hasPrompt) {
+    $promptProbe = [System.Windows.Forms.TextRenderer]::MeasureText(
+        $promptText, $promptFont,
+        (New-Object System.Drawing.Size($textWidth, [int]::MaxValue)),
+        [System.Windows.Forms.TextFormatFlags]::NoPrefix -bor [System.Windows.Forms.TextFormatFlags]::EndEllipsis)
+    $promptHeight = [int]$promptProbe.Height + 6
+}
+
+# Total text block height (conditional on prompt presence)
+if ($hasPrompt) {
+    $textBlockH = $titleHeight + $gapTitle + $promptHeight + $gapPrompt + $bodyHeight
+} else {
+    $textBlockH = $titleHeight + $gapTitle + $bodyHeight
+}
+$formHeight = $topPad + $textBlockH + $bottomPad
+
+# Vertical positions
+$label1Y      = $topPad
+$labelPromptY = $label1Y + $titleHeight + $gapTitle
+if ($hasPrompt) {
+    $label2Y = $labelPromptY + $promptHeight + $gapPrompt
+} else {
+    $label2Y = $labelPromptY
+}
+
+# Icon vertically centered on the whole text block
 $iconY = $topPad + [int](($textBlockH - $iconSize) / 2)
 if ($iconY -lt 20) { $iconY = 20 }
 
@@ -227,11 +307,11 @@ $screens = [System.Windows.Forms.Screen]::AllScreens
 $forms = New-Object System.Collections.ArrayList
 
 foreach ($screen in $screens) {
-    $form = New-Object System.Windows.Forms.Form
+    $form = New-Object NoActivateForm
     $form.Text = 'peon-ping'
     $form.TopMost = $true
     $form.FormBorderStyle = 'None'
-    $form.BackColor = [System.Drawing.Color]::FromArgb(30, 30, 40)
+    $form.BackColor = $bgColor
     $form.Size = New-Object System.Drawing.Size($formWidth, $formHeight)
     $form.ShowInTaskbar = $false
     $form.StartPosition = 'Manual'
@@ -250,6 +330,7 @@ foreach ($screen in $screens) {
         $form.Controls.Add($pictureBox)
     }
 
+    # Title
     $label1 = New-Object System.Windows.Forms.Label
     $label1.Text = '${title.replace(/'/g, "''")}'
     $label1.Font = $titleFont
@@ -259,6 +340,7 @@ foreach ($screen in $screens) {
     $label1.TextAlign = [System.Drawing.ContentAlignment]::TopLeft
     $label1.Location = New-Object System.Drawing.Point($textX, $label1Y)
 
+    # Body (3-line assistant summary; AutoEllipsis truncates overflow)
     $label2 = New-Object System.Windows.Forms.Label
     $label2.Text = '${body.replace(/'/g, "''")}'
     $label2.Font = $bodyFont
@@ -271,6 +353,22 @@ foreach ($screen in $screens) {
 
     $form.Controls.Add($label1)
     $form.Controls.Add($label2)
+
+    # Prompt (optional, between title and body). "> " prefix marks it as a
+    # quoted echo of the user's message.
+    if ($hasPrompt) {
+        $labelP = New-Object System.Windows.Forms.Label
+        $labelP.Text = '> ' + $promptText
+        $labelP.Font = $promptFont
+        $labelP.ForeColor = [System.Drawing.Color]::LightGray
+        $labelP.AutoSize = $false
+        $labelP.Size = New-Object System.Drawing.Size($textWidth, $promptHeight)
+        $labelP.TextAlign = [System.Drawing.ContentAlignment]::TopLeft
+        $labelP.AutoEllipsis = $true
+        $labelP.Location = New-Object System.Drawing.Point($textX, $labelPromptY)
+        $form.Controls.Add($labelP)
+    }
+
     $forms.Add($form) | Out-Null
 }
 
