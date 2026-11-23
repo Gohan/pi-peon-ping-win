@@ -151,6 +151,9 @@ export function playSound(file: string, volume: number, waitSeconds = 2): void {
   }
 
   if (child) {
+    child.on("error", () => {
+      if (currentSoundPid === child.pid) currentSoundPid = null;
+    });
     child.unref();
     currentSoundPid = child.pid ?? null;
     child.on("exit", () => {

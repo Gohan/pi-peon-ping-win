@@ -384,5 +384,8 @@ $timer.Start()
 
 [System.Windows.Forms.Application]::Run()`;
 
-  return { bin: "powershell.exe", args: ["-NoProfile", "-STA", "-Command", ps] };
+  // Prefer PowerShell 7 like the toast path above: a 5.1 child rewrites the
+  // console title to "Windows PowerShell 5.1" and never restores it, so the
+  // Windows Terminal tab stays wrong for the rest of the session.
+  return { bin: detectPwshBin() ?? "powershell.exe", args: ["-NoProfile", "-STA", "-Command", ps] };
 }

@@ -63,6 +63,18 @@ describe("notification", () => {
       expect(scriptArg).toContain("Body");
     });
 
+    it("builds winforms popup on pwsh so the 5.1 child cannot steal the console title", async () => {
+      const { buildNotifyCommand } = await import("../src/notification");
+      const { detectPwshBin } = await import("../src/platform");
+      const cmd = buildNotifyCommand("winforms", "Title", "Body");
+      expect(cmd).not.toBeNull();
+      expect(cmd!.args).toContain("-STA");
+      // A Windows PowerShell 5.1 child rewrites its console title and leaves it
+      // rewritten, so the tab shows "Windows PowerShell 5.1" after one popup.
+      const expected = detectPwshBin() ?? "powershell.exe";
+      expect(cmd!.bin).toBe(expected);
+    });
+
     it("returns null for unknown notifier", async () => {
       const { buildNotifyCommand } = await import("../src/notification");
       const cmd = buildNotifyCommand("unknown-thing" as any, "T", "B");

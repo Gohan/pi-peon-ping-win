@@ -18,9 +18,12 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 [${version}]: https://github.com/Gohan/pi-peon-ping-win/releases/tag/${tag}
 -->
 
-## [Unreleased]
+## [2.0.2] — 2026-06-19
 
 ### Fixed
+
+- Winforms popup no longer steals the Windows Terminal tab title. It now launches via PowerShell 7 when available (`detectPwshBin()`), matching the toast path; a Windows PowerShell 5.1 child rewrites its console title to "Windows PowerShell 5.1" and never restores it, so the tab stayed wrong for the rest of the session.
+- `playSound` no longer leaks a stale `currentSoundPid` when the spawned player fails to start (`child.on("error")` clears it), so the next `stopSound`/mute check isn't gated on a dead pid.
 
 - Compaction popup now fires on `session_compact` (after compaction completes) instead of `session_before_compact` (the preparation phase). The before-event is an interception point that other handlers can cancel via `{ cancel: true }`, so the old timing would announce "Context compacting" even when compaction was ultimately aborted. Status renamed `compacting` → `compacted`; body rewritten to `Context compacted`. Color stays yellow.
 
@@ -40,6 +43,8 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 ### Fixed
 
 - CI typecheck failure on `tui.select.cancel` — root cause was the stale `bun.lock` resolving to `@mariozechner/*@0.54.0` while local dev used 0.73.1; the migration above resolves it permanently
+
+[2.0.2]: https://github.com/Gohan/pi-peon-ping-win/releases/tag/v2.0.2
 
 ## [1.2.0] — 2026-06-19
 
