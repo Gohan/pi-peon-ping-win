@@ -18,7 +18,7 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 [${version}]: https://github.com/Gohan/pi-peon-ping-win/releases/tag/${tag}
 -->
 
-## [2.0.3] — 2026-06-19
+## [2.0.3] — 2026-11-23
 
 ### Fixed
 
@@ -26,7 +26,7 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
   Fix: the script now passes the loaded assembly's path (`[System.ComponentModel.Component].Assembly.Location`) in addition to `System.Windows.Forms`, but only when `$PSVersionTable.PSEdition -eq 'Core'` — one script, no 5.1/7 fork. Verified end to end both ways: the form's `Shown` event fires under `pwsh` and under `powershell.exe`.
 
-## [2.0.2] — 2026-06-19
+## [2.0.2] — 2026-11-23
 
 ### Fixed
 
@@ -88,7 +88,7 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 - Chinese characters clipped at the top of the body label: hardcoded `'Segoe UI'` font lacks CJK glyphs, forcing a font-link fallback to `Microsoft YaHei UI` whose ascent metrics differ. Switched to `SystemFonts.DefaultFont.FontFamily` so the system default UI font is used consistently (Flow-Launcher/Flow.Launcher#4373 has the same root cause)
 - CI publish workflow now reliably publishes via npm OIDC Trusted Publishing: dropped `setup-node`'s `registry-url` (it injects an empty `NODE_AUTH_TOKEN` that suppresses OIDC), upgraded npm to ≥11.5.1 in the job (Trusted Publishing requires it; Node 22 LTS ships npm 10.x), and added `--provenance` to `npm publish`
 
-## [1.0.0]
+## [1.0.0] — 2026-06-18
 
 ### Added
 
@@ -99,7 +99,7 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 - Default `volume` raised to `1.0` (upstream `0.5`) — peon-ping is an alert sound, and at 0.5 it's easy to miss on Windows
 - Custom WinForms popup on Windows (multi-screen, icon + title + body, auto-dismiss), bypassing Windows Toast entirely — no AUMID registration, no Focus Assist suppression, more visually prominent
 
-## [0.2.0]
+## [0.2.0] — 2026-02-23
 
 ### Added
 
@@ -112,7 +112,7 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 
 - Renamed `active_pack` config field to `default_pack` to match upstream peon-ping — existing configs are automatically migrated
 
-## [0.1.0]
+## [0.1.0] — 2026-02-19
 
 ### Added
 
