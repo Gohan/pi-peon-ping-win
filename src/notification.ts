@@ -206,7 +206,17 @@ function buildWinFormsCommand(
 # Form subclass that shows without stealing keyboard focus. TopMost keeps
 # it visually on top; ShowWithoutActivation keeps focus on the user's window.
 if (-not ("NoActivateForm" -as [type])) {
-    Add-Type -ReferencedAssemblies System.Windows.Forms @'
+    # PowerShell 7 runs on .NET; there a simple-name reference to
+    # System.Windows.Forms does not pull in System.ComponentModel.Primitives,
+    # so the C# below fails with CS0012 and New-Object NoActivateForm throws —
+    # the popup never appears. Windows PowerShell 5.1 resolved this via the
+    # GAC, which is why the pwsh switch surfaced it. Pass the loaded
+    # assembly's path so the compiler gets the real reference closure.
+    $refs = @('System.Windows.Forms')
+    if ($PSVersionTable.PSEdition -eq 'Core') {
+        $refs += [System.ComponentModel.Component].Assembly.Location
+    }
+    Add-Type -ReferencedAssemblies $refs @'
 using System.Windows.Forms;
 public class NoActivateForm : Form {
     protected override bool ShowWithoutActivation { get { return true; } }

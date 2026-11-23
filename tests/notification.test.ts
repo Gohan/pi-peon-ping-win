@@ -75,6 +75,19 @@ describe("notification", () => {
       expect(cmd!.bin).toBe(expected);
     });
 
+    it("winforms script passes a resolvable reference closure to Add-Type", async () => {
+      const { buildNotifyCommand } = await import("../src/notification");
+      const cmd = buildNotifyCommand("winforms", "Title", "Body")!;
+      const ps = cmd.args[cmd.args.length - 1];
+      // PowerShell 7 runs on .NET, where `-ReferencedAssemblies System.Windows.Forms`
+      // does not transitively resolve System.ComponentModel.Primitives: the C#
+      // NoActivateForm fails with CS0012, New-Object throws, no window appears.
+      // The script must therefore add the loaded assembly path on Core.
+      expect(ps).toContain("$PSVersionTable.PSEdition -eq 'Core'");
+      expect(ps).toContain("[System.ComponentModel.Component].Assembly.Location");
+      expect(ps).toMatch(/-ReferencedAssemblies \$refs/);
+    });
+
     it("returns null for unknown notifier", async () => {
       const { buildNotifyCommand } = await import("../src/notification");
       const cmd = buildNotifyCommand("unknown-thing" as any, "T", "B");

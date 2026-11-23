@@ -18,6 +18,14 @@ and this project attempts to adhere to [Semantic Versioning](https://semver.org/
 [${version}]: https://github.com/Gohan/pi-peon-ping-win/releases/tag/${tag}
 -->
 
+## [2.0.3] — 2026-06-19
+
+### Fixed
+
+- **Winforms popup rendered nothing under PowerShell 7** (regression from 2.0.2). On .NET, `Add-Type -ReferencedAssemblies System.Windows.Forms` resolves only the simple name and does not pull in `System.ComponentModel.Primitives`, so the embedded `NoActivateForm : Form` subclass failed to compile (CS0012). `New-Object NoActivateForm` then threw, every subsequent `$form.*` assignment threw too, and `Application.Run()` had no window to show. Windows PowerShell 5.1 resolved the same reference through the GAC, which is why the 2.0.2 switch to pwsh surfaced it.
+
+  Fix: the script now passes the loaded assembly's path (`[System.ComponentModel.Component].Assembly.Location`) in addition to `System.Windows.Forms`, but only when `$PSVersionTable.PSEdition -eq 'Core'` — one script, no 5.1/7 fork. Verified end to end both ways: the form's `Shown` event fires under `pwsh` and under `powershell.exe`.
+
 ## [2.0.2] — 2026-06-19
 
 ### Fixed
